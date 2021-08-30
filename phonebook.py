@@ -1,5 +1,5 @@
 # TODO: mutex
-class PhoneBook:
+class Phonebook:
     def __init__(self):
         self.phonebook = {}
 
@@ -9,7 +9,6 @@ class PhoneBook:
     def delete_entry_by_name(self, name):
         return self.phonebook.pop(name, None)
 
-    # TODO: can phones be None?
     def add_or_update_entry(self, name, phones):
         # log(f"{curr_func_name}({name}, {phones[:30]}... {len(phones)} chars)")
         self.phonebook[name] = phones

@@ -3,6 +3,7 @@ import re
 from enum import Enum
 import asyncio
 from typing import Optional
+from phonebook import Phonebook
 
 
 class Method(Enum):
@@ -48,9 +49,6 @@ async def check_with_proxy_server(message) -> Optional[str]:
     return data.decode()
 
 
-phonebook = PhoneBook()
-
-
 def format_response(status: ResponseStatus, data: Optional[str]) -> str:
     if data:
         f"{status.value} {PROTOCOL}\r\n{data}\r\n\r\n"
@@ -58,53 +56,61 @@ def format_response(status: ResponseStatus, data: Optional[str]) -> str:
         f"{status.value} {PROTOCOL}\r\n\r\n"
 
 
+phonebook = Phonebook()
+lock = asyncio.Lock()
+
 async def handle_message(message):
+    # remove
+    response = BAD_REQUEST_RESPONSE
     message_lines = message.rstrip("\r\n\r\n").split("\r\n")
-            # TODO: try rf""
-            # TODO: use 1 regex instead of 2
-            # match = re.match(
-            #             r"^(ОТДОВАЙ|ЗОПИШИ|УДОЛИ) (.+) РКСОК/1.0", message_lines[0]
-            #         )
-            # if match:
-            #     name = match.group(2)
+    # TODO: try rf""
+    # TODO: use 1 regex instead of 2
+    # match = re.match(
+    #             r"^(ОТДОВАЙ|ЗОПИШИ|УДОЛИ) (.+) РКСОК/1.0", message_lines[0]
+    #         )
+    # if match:
+    #     name = match.group(2)
     if re.match(
-                r"^(ОТДОВАЙ|ЗОПИШИ|УДОЛИ) ", message_lines[0]
-            ) and message_lines[0].endswith(PROTOCOL):
+        r"^(ОТДОВАЙ|ЗОПИШИ|УДОЛИ) ", message_lines[0]
+    ) and message_lines[0].endswith(PROTOCOL):
         response_from_proxy_server = await check_with_proxy_server(message)
         if response_from_proxy_server.startswith("НИЛЬЗЯ"):
             response = response_from_proxy_server
         # TODO: check this inside send_request_to_proxy_server
         elif response_from_proxy_server.startswith("МОЖНА"):
             entry_name = re.match(
-                        r"^(ОТДОВАЙ|ЗОПИШИ|УДОЛИ) (.+) РКСОК/1.0", message_lines[0]
-                    ).group(2)
+                r"^(ОТДОВАЙ|ЗОПИШИ|УДОЛИ) (.+) РКСОК/1.0", message_lines[0]
+            ).group(2)
+
             if len(entry_name) <= 30:
                 # TODO: extrach method name, not .startswith
                 # TODO: use constants
-                if message.startswith("ОТДОВАЙ"):
-                    # log
-                    phones = phonebook.get_phones_by_name(entry_name)
-                    # TODO: Return
-                    response = (
+                    if message.startswith("ОТДОВАЙ"):
+                        # log
+                        async with lock:
+                            phones = phonebook.get_phones_by_name(entry_name)
+                            # TODO: Return
+                            response = (
                                 OK_RESPONSE + phones + "\r\n\r\n"
                                 if phones
                                 else NOT_FOUND_RESPONSE
                             )
 
-                elif message.startswith("УДОЛИ"):
-                    # TODO: remove ?:
-                    response = (
+                    elif message.startswith("УДОЛИ"):
+                        async with lock:
+                            # TODO: remove ?:
+                            response = (
                                 f"{OK_RESPONSE}\r\n"
                                 if phonebook.delete_entry_by_name(entry_name)
                                 else NOT_FOUND_RESPONSE
                             )
-
-                elif message.startswith("ЗОПИШИ"):
-                    phonebook.add_or_update_entry(
+                    elif message.startswith("ЗОПИШИ"):
+                        async with lock:
+                            phonebook.add_or_update_entry(
                                 entry_name, "\r\n".join(message_lines[1:])
                             )
-                    response = f"{OK_RESPONSE}\r\n"
-                
+                            response = f"{OK_RESPONSE}\r\n"
+
     # TODO: return error
     return response
 
@@ -119,9 +125,11 @@ async def rksok_handler(reader, writer):
                 break
     except Exception as e:
         # TODO: print ERROR
+        # log
         print(type(e), e.args)
     else:
         message = data.decode()
+        # log
         print(f"Received: {message!r} {len(message)}")
 
         # TODO: move into handle_message
@@ -132,6 +140,7 @@ async def rksok_handler(reader, writer):
             response = BAD_REQUEST_RESPONSE
 
         # TODO: ideally don't respond if there's an exception
+        # log
         print(f"Sent: {response!r}")
         writer.write(response.encode())
         await writer.drain()
@@ -142,6 +151,7 @@ async def main():
     server = await asyncio.start_server(rksok_handler, SERVER_NAME, SERVER_PORT)
 
     address = server.sockets[0].getsockname()
+    # log
     print(f"Serving on {address}")
 
     async with server:
