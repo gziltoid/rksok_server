@@ -3,9 +3,10 @@ import re
 from enum import Enum
 import asyncio
 from typing import Optional
+from loguru import logger
 from phonebook import Phonebook
 
-# TODO: add python prototypes
+# TODO: add python prototypes and docstrings
 
 
 class RequestMethod(Enum):
@@ -37,6 +38,7 @@ async def check_with_proxy_server(message) -> Optional[str]:
     await writer.drain()
 
     response = (await reader.read()).decode()
+    logger.info(response)
 
     writer.close()
     await writer.wait_closed()
@@ -52,6 +54,7 @@ def format_response(status: ResponseStatus, data: Optional[str] = None) -> str:
 
 
 phonebook = Phonebook()
+
 lock = asyncio.Lock()
 
 
@@ -69,8 +72,8 @@ async def handle_message(message):
             request_method, entry_name = match.group(1), match.group(2)
 
             if len(entry_name) <= 30:
+                logger.info(request_method)
                 if request_method == RequestMethod.GET.value:
-                    # log
                     async with lock:
                         phones = phonebook.get_phones_by_name(entry_name)
                         return (
@@ -96,40 +99,35 @@ async def handle_message(message):
     return format_response(ResponseStatus.BAD_REQUEST)
 
 
+@logger.catch
 async def rksok_handler(reader, writer):
-    try:
-        data = b""
-        while True:
-            chunk = await reader.read(1024)
-            data += chunk
-            if not chunk or chunk.endswith(b"\r\n\r\n"):
-                break
-    except Exception as e:
-        # log
-        print("ERROR:", type(e))
-    else:
-        message = data.decode()
-        # log
-        print(f"Received: {message!r} {len(message)}")
+    data = b""
+    while True:
+        chunk = await reader.read(1024)
+        data += chunk
+        if not chunk or chunk.endswith(b"\r\n\r\n"):
+            break
 
-        response = await handle_message(message)
+    message = data.decode()
+    logger.info(f"Received: {message[:30]!r}... {len(message)} chars")
 
-        # log
-        print(f"Sent: {response!r}")
-        writer.write(response.encode())
-        await writer.drain()
-        writer.close()
+    response = await handle_message(message)
+
+    writer.write(response.encode())
+    logger.info(f"Sent: {response[:30]!r}")
+    await writer.drain()
+    writer.close()
 
 
 async def main():
+    logger.add('rksok.log', format='{time} {level} {message}',
+               level='INFO', rotation='100 KB', compression='zip')
     server = await asyncio.start_server(rksok_handler, SERVER_NAME, SERVER_PORT)
 
     address = server.sockets[0].getsockname()
-    # log
-    print(f"Serving on {address}")
+    logger.info(f"Serving on {address}")
 
     async with server:
         await server.serve_forever()
-
 
 asyncio.run(main())
