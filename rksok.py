@@ -6,8 +6,6 @@ from typing import Optional
 from loguru import logger
 from phonebook import Phonebook
 
-# TODO: add python prototypes and docstrings
-
 
 class RequestMethod(Enum):
     GET = "ОТДОВАЙ"
@@ -120,8 +118,13 @@ async def rksok_handler(reader, writer):
 
 
 async def main():
-    logger.add('rksok.log', format='{time} {level} {message}',
-               level='INFO', rotation='100 KB', compression='zip')
+    logger.add(
+        "rksok.log",
+        format="{time} {level} {message}",
+        level="INFO",
+        rotation="100 KB",
+        compression="zip",
+    )
     server = await asyncio.start_server(rksok_handler, SERVER_NAME, SERVER_PORT)
 
     address = server.sockets[0].getsockname()
@@ -129,5 +132,6 @@ async def main():
 
     async with server:
         await server.serve_forever()
+
 
 asyncio.run(main())
