@@ -23,7 +23,7 @@ PROTOCOL = "РКСОК/1.0"
 
 PROXY_HOST = "vragi-vezde.to.digital"
 PROXY_PORT = 51624
-SERVER_NAME = "127.0.0.1"
+SERVER_NAME = "0.0.0.0"
 SERVER_PORT = 8888
 
 
