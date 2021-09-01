@@ -29,7 +29,7 @@ SERVER_NAME = "127.0.0.1"
 SERVER_PORT = 8888
 
 
-async def check_with_proxy_server(message) -> Optional[str]:
+async def check_with_proxy_server(message: str) -> Optional[str]:
     """Returns a response from the proxy server if the request is denied, otherwise None"""
     reader, writer = await asyncio.open_connection(PROXY_HOST, PROXY_PORT)
 
@@ -38,7 +38,7 @@ async def check_with_proxy_server(message) -> Optional[str]:
     await writer.drain()
 
     response = (await reader.read()).decode()
-    logger.info(response)
+    logger.info(f"Proxy: {response!r}")
 
     writer.close()
     await writer.wait_closed()
@@ -58,7 +58,7 @@ phonebook = Phonebook()
 lock = asyncio.Lock()
 
 
-async def handle_message(message):
+async def handle_message(message: str) -> str:
     if message.endswith("\r\n\r\n"):
         message_lines = message.rstrip("\r\n\r\n").split("\r\n")
         methods = "|".join([x.value for x in RequestMethod])
