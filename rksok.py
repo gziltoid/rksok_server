@@ -112,7 +112,7 @@ async def rksok_handler(reader, writer):
     response = await handle_message(message)
 
     writer.write(response.encode())
-    logger.info(f"Sent: {response[:30]!r}")
+    logger.info(f"Sent: {response[:30]!r}... {len(response)} chars")
     await writer.drain()
     writer.close()
 
